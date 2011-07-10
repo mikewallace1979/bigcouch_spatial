@@ -12,7 +12,7 @@
 
 -module(couch_spatial_compactor).
 
--include ("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include ("couch_spatial.hrl").
 
 -export([start_compact/2]).

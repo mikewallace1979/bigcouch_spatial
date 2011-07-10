@@ -2,5 +2,6 @@
 *~
 *.orig
 *.rej
+*.swp
 erl_crash.dump
 coverage

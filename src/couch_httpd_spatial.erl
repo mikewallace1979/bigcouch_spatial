@@ -11,7 +11,7 @@
 % the License.
 
 -module(couch_httpd_spatial).
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include("couch_spatial.hrl").
 
 -export([handle_spatial_req/3, spatial_etag/3, spatial_etag/4,

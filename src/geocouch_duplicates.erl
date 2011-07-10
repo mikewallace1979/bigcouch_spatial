@@ -16,7 +16,7 @@
 % are not exported by CouchDB. Here's the place to put the code from
 % those functions.
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -export([start_doc_map/3, start_list_resp/6, send_non_empty_chunk/2,
     sort_lib/1, list_index_files/1, make_arity_3_fun/1]).
 

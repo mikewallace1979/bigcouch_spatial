@@ -1,0 +1,8 @@
+%% -*- mode:erlang;tab-width:4;erlang-indent-level:4;indent-tabs-mode:nil -*-
+{application, geocouch,
+ [
+  {description, "a spatial index for CouchDB"},
+  {vsn, "0.1"}
+]}.
+
+

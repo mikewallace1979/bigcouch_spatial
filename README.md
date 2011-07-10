@@ -3,71 +3,8 @@ Welcome to the world of GeoCouch
 
 GeoCouch is a spatial extension for Apache CouchDB.
 
-Prerequisites
--------------
-
-A working installation of CouchDB with corresponding source
-code. GeoCouch works best with the latest stable releases of CouchDB
-(must be >= 1.0.2).
-
-
-Installation
-------------
-
-### Get GeoCouch:
-
-    git clone https://github.com/couchone/geocouch.git
-    cd geocouch
-
-### Compilation
-
-Note: Always replace `<vanilla-couch>` with the path to your CouchDB
-source and `<geocouch>` with the location of the GeoCouch source.
-
-Set the `COUCH_SRC` environment to the directory that contains the
-CouchDB core source (`<vanilla-couch>/src/couchdb/`).
-
-    export COUCH_SRC=<vanilla-couch>/src/couchdb
-
-Run "make" in your <geocouch> directory
-
-    make
-
-Copy the configuration file for GeoCouch from
-`<geocouch>/etc/couchdb/local.d/` to
-`<vanilla-couch>/etc/couchdb/local.d/`
-
-    cp <geocouch>/etc/couchdb/local.d/geocouch.ini <vanilla-couch>/etc/couchdb/local.d/
-
-### Futon tests
-
-To make sure your installation is working also copy the Futon tests
-over (from `<geocouch>/share/www/script/test` to
-`<vanilla-couch>/share/www/script/test`):
-
-    cp <geocouch>/share/www/script/test/* <vanilla-couch>/share/www/script/test/
-
-Add the test to `<vanilla-couch>/share/www/script/test/couch_tests.js`
-
-    loadTest("spatial.js");
-    loadTest("list_spatial.js");
-    loadTest("etags_spatial.js");
-    loadTest("multiple_spatial_rows.js");
-    loadTest("spatial_compaction.js");
-    loadTest("spatial_design_docs.js");
-
-### Run CouchDB with GeoCouch
-
-The compiled beam files from GeoCouch need to be in Erlang's path,
-which can be set with the `ERL_FLAGS` environment variable:
-
-    export ERL_FLAGS="-pa <geocouch>/build"
-
-If you run a dev instance with CouchDB's `./utils/run` you can also
-define it on startup:
-
-    ERL_FLAGS="-pa <geocouch>/build" <vanilla-couch>/utils/run
-
+This version have been modified for [refuge project](http://refuge.io)
+needs.
 
 Using GeoCouch
 --------------

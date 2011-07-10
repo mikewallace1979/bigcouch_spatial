@@ -26,7 +26,7 @@
 -export([cleanup_index_files/1]).
 
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include("couch_spatial.hrl").
 
 

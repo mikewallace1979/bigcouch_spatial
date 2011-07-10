@@ -26,7 +26,7 @@
 -export([geocouch_to_geojsongeom/1]).
 
 
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include("couch_spatial.hrl").
 
 update(Owner, Group) ->

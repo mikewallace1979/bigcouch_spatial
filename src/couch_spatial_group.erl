@@ -328,19 +328,19 @@ reply_all(#group_state{waiting_list=WaitList}=State, Reply) ->
     State#group_state{waiting_list=[]}.
 
 open_db_group(DbName, DDocId) ->
-    case couch_db:open_int(DbName, []) of
-    {ok, Db} ->
-        case couch_db:open_doc(Db, DDocId, [ejson_body]) of
-        {ok, Doc} ->
-            {ok, Db, design_doc_to_spatial_group(Doc)};
-        Else ->
-            couch_db:close(Db),
-            Else
-        end;
-    Else ->
-        Else
+    {Pid, Ref} = spawn_monitor(fun() ->
+        exit(try
+            fabric:open_doc(mem3:dbname(DbName), DDocId, [])
+        catch error:database_does_not_exist ->
+            {ok, Db} = couch_db:open(DbName, []),
+            couch_db:open_doc(Db, DDocId)
+        end)
+    end),
+    receive {'DOWN', Ref, process, Pid, {ok, Doc}} ->
+        {ok, design_doc_to_spatial_group(Doc)};
+    {'DOWN', Ref, process, Pid, Error} ->
+        Error
     end.
-
 
 design_doc_to_spatial_group(Doc) ->
     #doc{id=Id, body={Fields}} = couch_doc:with_ejson_body(Doc),

@@ -170,8 +170,12 @@ spatial_docs(Proc, Docs) ->
 
 % This fun computes once for each document
 % This is from an old revision (796805) of couch_view_updater
-process_doc(Db, Owner, DocInfo, {Docs, Group, IndexKVs, DocIdIndexIdKeys}) ->
+process_doc(Db, Owner, FullDocInfo, {Docs, Group, IndexKVs, DocIdIndexIdKeys}) ->
     #spatial_group{ design_options = DesignOptions } = Group,
+
+    %% we get a FullDocInfo here
+    DocInfo = couch_doc:to_doc_info(FullDocInfo),
+
     #doc_info{id=DocId, revs=[#rev_info{deleted=Deleted}|_]} = DocInfo,
     LocalSeq = proplists:get_value(<<"local_seq">>,
         DesignOptions, false),

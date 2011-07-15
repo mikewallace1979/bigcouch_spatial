@@ -16,7 +16,7 @@
 
 -export([add_remove/5, area/1, calc_mbr/1, calc_nodes_mbr/1, count_lookup/3,
     count_total/2, disjoint/2, foldl/4, insert/4, lookup/5, merge_mbr/2,
-    split_node/1, within/2]).
+    split_node/1, within/2, count_lookup/4]).
 
 % TODO vmx: Function parameters order is inconsitent between insert and delete.
 
@@ -98,6 +98,15 @@ count_lookup(Fd, Pos, Bbox) ->
         {ok, []} -> 0;
         {ok, Count} -> Count
     end.
+
+count_lookup(Fd, Pos, Bbox, Bounds) ->
+    case lookup(Fd, Pos, Bbox, {fun(_Item, Acc) -> {ok, Acc+1} end, 0},
+        Bounds) of
+        {ok, []} -> 0;
+        {ok, Count} -> Count
+    end.
+
+
 
 % Returns the total number of geometries
 -spec count_total(Fd::file:io_device(), RootPos::integer()) -> integer().

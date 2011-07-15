@@ -25,7 +25,8 @@
 % Either answer a normal spatial query, or keep dispatching if the path part
 % after _spatial starts with an underscore.
 handle_spatial_req(#httpd{
-        path_parts=[_, _, _Dname, _, SpatialName|_]}=Req, Db, DDoc) ->
+        path_parts=[_, _, _, _, SpatialName|_]}=Req, Db, DDoc) ->
+
     case SpatialName of
     % the path after _spatial starts with an underscore => dispatch
     <<$_,_/binary>> ->
@@ -135,7 +136,7 @@ output_spatial_index(Req, Index, Group, Db, QueryArgs) ->
     end).
 
 % counterpart in couch_httpd_view is make_view_fold/7
-make_spatial_fold_funs(Req, _QueryArgs, Etag, _Db, UpdateSeq, HelperFuns) ->
+make_spatial_fold_funs(Req, QueryArgs, Etag, Db, UpdateSeq, HelperFuns) ->
     #spatial_fold_helper_funs{
         start_response = StartRespFun,
         send_row = SendRowFun
@@ -143,18 +144,20 @@ make_spatial_fold_funs(Req, _QueryArgs, Etag, _Db, UpdateSeq, HelperFuns) ->
     % The Acc is there to output characters that belong to the previous line,
     % but only if one line follows (think of a comma separated list which
     % doesn't have a comma at the last item)
-    fun({{Bbox, DocId}, {Geom, Value}}, {Resp, Acc}) ->
+    fun({{_Bbox, _DocId}, {_Geom, _Value}}=Row, {Resp, Acc}) ->
+        Row0 = possibly_embed_doc(Db, QueryArgs, Row),
         case Resp of
         undefined ->
             {ok, NewResp, BeginBody} = StartRespFun(Req, Etag, UpdateSeq),
-            {ok, Acc2} = SendRowFun(
-                NewResp, {{Bbox, DocId}, {Geom, Value}}, BeginBody),
+            {ok, Acc2} = SendRowFun(NewResp, Row0, BeginBody),
             {ok, {NewResp, Acc2}};
         Resp ->
-            {ok, Acc2} = SendRowFun(Resp, {{Bbox, DocId}, {Geom, Value}}, Acc),
+            {ok, Acc2} = SendRowFun(Resp, Row0, Acc),
             {ok, {Resp, Acc2}}
         end
     end.
+
+
 
 % counterpart in couch_httpd_view is finish_view_fold/5
 finish_spatial_fold(Req, Resp) ->
@@ -168,6 +171,20 @@ finish_spatial_fold(Req, Resp) ->
         end_json_response(Resp)
     end.
 
+
+possibly_embed_doc(Db, #spatial_query_args{include_docs=true}, {{Bbox,
+            DocId}, {Geom, Value}}) ->
+    {Pid, Ref} = spawn_monitor(fun() -> 
+                exit(couch_db:open_doc(Db, DocId, [])) end),
+    {ok, NewDoc} =
+    receive {'DOWN',Ref,process,Pid, Resp} ->
+            Resp
+    end,
+
+    {{Bbox, DocId}, {Geom, Value, NewDoc}};
+possibly_embed_doc(_Db, _QueryArgs, Row) ->
+    Row.
+
 % counterpart in couch_httpd_view is json_view_start_resp/6
 json_spatial_start_resp(Req, Etag, UpdateSeq) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
@@ -175,15 +192,37 @@ json_spatial_start_resp(Req, Etag, UpdateSeq) ->
             "{\"update_seq\":~w,\"rows\":[\r\n", [UpdateSeq]),
     {ok, Resp, BeginBody}.
 
+
 % counterpart in couch_httpd_view is send_json_view_row/5
-send_json_spatial_row(Resp, {{Bbox, DocId}, {Geom, Value}}, RowFront) ->
-    JsonObj = {[
+send_json_spatial_row(Resp, Row, RowFront) ->
+    JsonObj = spatial_json_row_obj(Row),
+    
+    send_chunk(Resp, RowFront ++  ?JSON_ENCODE(JsonObj)),
+    {ok, ",\r\n"}.
+
+
+spatial_json_row_obj({{Bbox, DocId}, {Geom, Value, {error,Reason}}}) ->
+    {[
         {<<"id">>, DocId},
         {<<"bbox">>, erlang:tuple_to_list(Bbox)},
         {<<"geometry">>, couch_spatial_updater:geocouch_to_geojsongeom(Geom)},
-        {<<"value">>, Value}]},
-    send_chunk(Resp, RowFront ++  ?JSON_ENCODE(JsonObj)),
-    {ok, ",\r\n"}.
+        {<<"value">>, Value},
+        {<<"error">>, Reason}]};
+spatial_json_row_obj({{Bbox, DocId}, {Geom, Value, Doc}}) ->
+    JsonDoc = couch_doc:to_json_obj(Doc, []),
+    {[
+        {<<"id">>, DocId},
+        {<<"bbox">>, erlang:tuple_to_list(Bbox)},
+        {<<"geometry">>, couch_spatial_updater:geocouch_to_geojsongeom(Geom)},
+        {<<"value">>, Value},
+        {<<"doc">>, JsonDoc}]};
+spatial_json_row_obj({{Bbox, DocId}, {Geom, Value}}) ->
+    {[
+        {<<"id">>, DocId},
+        {<<"bbox">>, erlang:tuple_to_list(Bbox)},
+        {<<"geometry">>, couch_spatial_updater:geocouch_to_geojsongeom(Geom)},
+        {<<"value">>, Value}]}.
+
 
 % counterpart in couch_httpd_view is view_group_etag/3 resp. /4
 spatial_etag(Db, Group, Index) ->
@@ -232,6 +271,10 @@ parse_spatial_param("count", _Value) ->
     throw({query_parse_error, <<"count only available as count=true">>});
 parse_spatial_param("plane_bounds", Bounds) ->
     [{bounds, list_to_tuple(?JSON_DECODE("[" ++ Bounds ++ "]"))}];
+parse_spatial_param("limit", Limit) ->
+    [{bounds, parse_positive_int_param(Limit)}];
+parse_spatial_param("include_docs", Value) ->
+    [{include_docs, parse_bool_param(Value)}];
 parse_spatial_param(Key, Value) ->
     [{extra, {Key, Value}}].
 
@@ -247,5 +290,37 @@ validate_spatial_query(count, true, Args) ->
     Args#spatial_query_args{count=true};
 validate_spatial_query(bounds, Value, Args) ->
     Args#spatial_query_args{bounds=Value};
+validate_spatial_query(limit, Value, Args) ->
+    Args#spatial_query_args{limit=Value};
+validate_spatial_query(include_docs, true, Args) ->
+    Args#spatial_query_args{include_docs=true};
 validate_spatial_query(extra, _Value, Args) ->
     Args.
+
+parse_bool_param(Val) ->
+    case string:to_lower(Val) of
+    "true" -> true;
+    "false" -> false;
+    _ ->
+        Msg = io_lib:format("Invalid boolean parameter: ~p", [Val]),
+        throw({query_parse_error, ?l2b(Msg)})
+    end.
+
+parse_int_param(Val) ->
+    case (catch list_to_integer(Val)) of
+    IntVal when is_integer(IntVal) ->
+        IntVal;
+    _ ->
+        Msg = io_lib:format("Invalid value for integer parameter: ~p", [Val]),
+        throw({query_parse_error, ?l2b(Msg)})
+    end.
+
+parse_positive_int_param(Val) ->
+    case parse_int_param(Val) of
+    IntVal when IntVal >= 0 ->
+        IntVal;
+    _ ->
+        Fmt = "Invalid value for positive integer parameter: ~p",
+        Msg = io_lib:format(Fmt, [Val]),
+        throw({query_parse_error, ?l2b(Msg)})
+    end.

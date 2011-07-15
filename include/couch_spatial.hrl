@@ -59,7 +59,9 @@
     stale=nil,
     count=false,
     % Bounds of the cartesian plane
-    bounds=nil
+    bounds=nil,
+    limit=10000000000,
+    include_docs=false
 }).
 
 % The counterpart to #spatial_fold_helper_funs in the view server is

@@ -118,14 +118,19 @@ output_spatial_index(Req, Index, Group, Db, QueryArgs) ->
         bounds = Bounds
     } = QueryArgs,
     CurrentEtag = spatial_etag(Db, Group, Index),
+
+    Total = vtree:count_lookup(Group#spatial_group.fd,
+                               Index#spatial.treepos,
+                               Bbox),
+
     HelperFuns = #spatial_fold_helper_funs{
         start_response = fun json_spatial_start_resp/3,
-        send_row = fun send_json_spatial_row/3
+        send_row = fun send_json_spatial_row/3,
+        total_rows = Total
     },
     couch_httpd:etag_respond(Req, CurrentEtag, fun() ->
         FoldFun = make_spatial_fold_funs(
-                    Req, QueryArgs, CurrentEtag, Db,
-                    Group#spatial_group.current_seq, HelperFuns),
+                    Req, QueryArgs, CurrentEtag, Db, HelperFuns),
         FoldAccInit = {undefined, ""},
         % In this case the accumulator consists of the response (which
         % might be undefined) and the actual accumulator we only care
@@ -136,10 +141,11 @@ output_spatial_index(Req, Index, Group, Db, QueryArgs) ->
     end).
 
 % counterpart in couch_httpd_view is make_view_fold/7
-make_spatial_fold_funs(Req, QueryArgs, Etag, Db, UpdateSeq, HelperFuns) ->
+make_spatial_fold_funs(Req, QueryArgs, Etag, Db, HelperFuns) ->
     #spatial_fold_helper_funs{
         start_response = StartRespFun,
-        send_row = SendRowFun
+        send_row = SendRowFun,
+        total_rows = TotalRows
     } = HelperFuns,
     % The Acc is there to output characters that belong to the previous line,
     % but only if one line follows (think of a comma separated list which
@@ -148,7 +154,7 @@ make_spatial_fold_funs(Req, QueryArgs, Etag, Db, UpdateSeq, HelperFuns) ->
         Row0 = possibly_embed_doc(Db, QueryArgs, Row),
         case Resp of
         undefined ->
-            {ok, NewResp, BeginBody} = StartRespFun(Req, Etag, UpdateSeq),
+            {ok, NewResp, BeginBody} = StartRespFun(Req, Etag, TotalRows),
             {ok, Acc2} = SendRowFun(NewResp, Row0, BeginBody),
             {ok, {NewResp, Acc2}};
         Resp ->
@@ -186,10 +192,10 @@ possibly_embed_doc(_Db, _QueryArgs, Row) ->
     Row.
 
 % counterpart in couch_httpd_view is json_view_start_resp/6
-json_spatial_start_resp(Req, Etag, UpdateSeq) ->
+json_spatial_start_resp(Req, Etag, TotalRows) ->
     {ok, Resp} = start_json_response(Req, 200, [{"Etag", Etag}]),
     BeginBody = io_lib:format(
-            "{\"update_seq\":~w,\"rows\":[\r\n", [UpdateSeq]),
+            "{\"total_rows\":~w,\"rows\":[\r\n", [TotalRows]),
     {ok, Resp, BeginBody}.
 
 

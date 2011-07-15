@@ -69,6 +69,5 @@
 % #view__fold_helper_funs
 -record(spatial_fold_helper_funs, {
     start_response,
-    send_row,
-    total_rows=0
+    send_row
 }).

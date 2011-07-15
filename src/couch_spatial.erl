@@ -58,7 +58,7 @@ get_group_server(DbName, DDocName) ->
     % get signature for group
     case couch_spatial_group:open_db_group(DbName, DDocName) of
     % do we need to close this db?
-    {ok, _Db, Group} ->
+    {ok, Group} ->
 ?LOG_DEBUG("get_group_server: ~p", [DDocName]),
         case gen_server:call(couch_spatial, {get_group_server, DbName, Group}) of
         {ok, Pid} ->

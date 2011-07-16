@@ -62,8 +62,7 @@ start_link(InitArgs) ->
 request_group(Pid, Seq) ->
     ?LOG_DEBUG("request_group {Pid, Seq} ~p", [{Pid, Seq}]),
     case gen_server:call(Pid, {request_group, Seq}, infinity) of
-    {ok, Group, RefCounter} ->
-        couch_ref_counter:add(RefCounter),
+    {ok, Group, _RefCounter} ->
         {ok, Group};
     Error ->
         ?LOG_DEBUG("request_group Error ~p", [Error]),
@@ -72,22 +71,22 @@ request_group(Pid, Seq) ->
 
 
 
-init({InitArgs, ReturnPid, Ref}) ->
+init({{_, DbName, _} = InitArgs, ReturnPid, Ref}) ->
     process_flag(trap_exit, true),
     case prepare_group(InitArgs, false) of
     {ok, #spatial_group{db=Db, fd=Fd, current_seq=Seq}=Group} ->
         case Seq > couch_db:get_update_seq(Db) of
         true ->
             ReturnPid ! {Ref, self(), {error, invalid_view_seq}},
+            couch_db:close(Db),
             ignore;
         _ ->
-            couch_db:monitor(Db),
-            {ok, RefCounter} = couch_ref_counter:start([Fd]),
+            try couch_db:monitor(Db) after couch_db:close(Db) end,
             {ok, #group_state{
-                    db_name=couch_db:name(Db),
+                    db_name=DbName,
                     init_args=InitArgs,
                     group=Group,
-                    ref_counter=RefCounter}}
+                    ref_counter=erlang:monitor(process,Fd)}}
         end;
     Error ->
         ReturnPid ! {Ref, self(), Error},

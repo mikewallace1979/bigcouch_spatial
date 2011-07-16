@@ -17,22 +17,9 @@
 % those functions.
 
 -include_lib("couch/include/couch_db.hrl").
--export([start_doc_map/3, start_list_resp/6, send_non_empty_chunk/2,
-    sort_lib/1, list_index_files/1, make_arity_3_fun/1]).
 
-% From couch_query_servers.erl
-start_doc_map(Lang, Functions, Lib) ->
-    Proc = couch_query_servers:get_os_process(Lang),
-    case Lib of
-    {[]} -> ok;
-    Lib ->
-        true = couch_query_servers:proc_prompt(Proc, [<<"add_lib">>, Lib])
-    end,
-    lists:foreach(fun(FunctionSource) ->
-        true = couch_query_servers:proc_prompt(
-            Proc, [<<"add_fun">>, FunctionSource])
-    end, Functions),
-    {ok, Proc}.
+-export([start_list_resp/6, send_non_empty_chunk/2,
+    sort_lib/1, list_index_files/1, make_arity_3_fun/1]).
 
 % From couch_httpd_show
 start_list_resp(QServer, LName, Req, Db, Head, Etag) ->

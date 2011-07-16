@@ -57,37 +57,37 @@ delete_from_ets(Pid, DbName, Sig) ->
 get_group_server(DbName, DDocName) ->
     % get signature for group
     case couch_spatial_group:open_db_group(DbName, DDocName) of
-    % do we need to close this db?
-    {ok, Group} ->
-?LOG_DEBUG("get_group_server: ~p", [DDocName]),
-        case gen_server:call(couch_spatial, {get_group_server, DbName, Group}) of
-        {ok, Pid} ->
-            Pid;
+        % do we need to close this db?
+        {ok, _Db, Group} ->
+            ?LOG_DEBUG("get_group_server: ~p", [DDocName]),
+            case gen_server:call(couch_spatial, {get_group_server, DbName, Group}) of
+                {ok, Pid} ->
+                    Pid;
+                Error ->
+                    throw(Error)
+            end;
         Error ->
             throw(Error)
-        end;
-    Error ->
-        throw(Error)
     end.
 
 get_group(Db, GroupId, Stale) ->
     MinUpdateSeq = case Stale of
-    ok -> 0;
-    update_after -> 0;
-    _Else -> couch_db:get_update_seq(Db)
+        ok -> 0;
+        update_after -> 0;
+        _Else -> couch_db:get_update_seq(Db)
     end,
-?LOG_DEBUG("get_group: MinUpdateSeq: ~p (stale? ~p)", [MinUpdateSeq, Stale]),
+    ?LOG_DEBUG("get_group: MinUpdateSeq: ~p (stale? ~p)", [MinUpdateSeq, Stale]),
     GroupPid = get_group_server(couch_db:name(Db), GroupId),
     Result = couch_spatial_group:request_group(GroupPid, MinUpdateSeq),
     case Stale of
-    update_after ->
-        % best effort, process might die
-        spawn(fun() ->
-            LastSeq = couch_db:get_update_seq(Db),
-            couch_spatial_group:request_group(GroupPid, LastSeq)
-        end);
-    _ ->
-        ok
+        update_after ->
+            % best effort, process might die
+            spawn(fun() ->
+                        LastSeq = couch_db:get_update_seq(Db),
+                        couch_spatial_group:request_group(GroupPid, LastSeq)
+                end);
+        _ ->
+            ok
     end,
     Result.
 
@@ -209,7 +209,7 @@ handle_cast(foo,State) ->
 handle_info({'EXIT', FromPid, Reason}, Server) ->
     case ets:lookup(couch_spatial_groups_by_updater, FromPid) of
     [] ->
-        if Reason /= normal ->
+        if Reason /= normal, Reason =/= no_db_file ->
             % non-updater linked process died, we propagate the error
             ?LOG_ERROR("Exit on non-updater process: ~p", [Reason]),
             exit(Reason);
@@ -218,6 +218,15 @@ handle_info({'EXIT', FromPid, Reason}, Server) ->
     [{_, {DbName, GroupId}}] ->
         delete_from_ets(FromPid, DbName, GroupId)
     end,
+    {noreply, Server};
+
+handle_info({'DOWN', _, _, _, {DbName, Sig, Reply}}, Server) ->
+    [{_, WaitList}] = ets:lookup(spatial_group_servers_by_sig, {DbName, Sig}),
+    [gen_server:reply(From, Reply) || From <- WaitList],
+    case Reply of {ok, NewPid} ->
+        link(NewPid),
+        add_to_ets(NewPid, DbName, Sig);
+     _ -> ok end,
     {noreply, Server};
 
 handle_info(_Msg, Server) ->

@@ -74,15 +74,14 @@ bulk_load(Fd, _RootPos, TargetTreeHeight, Nodes) when TargetTreeHeight==0 ->
 
     {_Mbrs, PosList} = lists:unzip(MbrAndPosList),
     NewNodes = load_nodes(Fd, PosList),
-    {ok, NewPos, _} = case length(NewNodes) of
-    % single node as root
-    1 ->
-        Written = couch_file:append_term(Fd, hd(NewNodes)),
-        ok = couch_file:flush(Fd),
-        Written;
-    % multiple nodes
-    _ ->
-        write_parent(Fd, NewNodes)
+    {ok, NewPos} = case length(NewNodes) of
+        % single node as root
+        1 -> 
+            Result = couch_file:append_term(Fd, hd(NewNodes)),
+            ok = couch_file:sync(Fd),
+            Result;
+        % multiple nodes
+        _ -> write_parent(Fd, NewNodes)
     end,
     {ok, NewPos, TreeHeight};
 bulk_load(Fd, RootPos, TargetTreeHeight, Nodes) ->
@@ -108,12 +107,12 @@ bulk_load(Fd, RootPos, TargetTreeHeight, Nodes) ->
     {NewPos, NewHeight2, NewMbr} = case length(Result) of
     % single node as root
     1 ->
-        {ok, ResultPos, _} = couch_file:append_term(Fd, hd(Result)),
-        ok = couch_file:flush(Fd),
+        {ok, ResultPos} = couch_file:append_term(Fd, hd(Result)),
+        ok = couch_file:sync(Fd),
         {ResultPos, NewHeight, element(1, hd(Result))};
     % multiple nodes
     _ ->
-        {ok, ResultPos, _} = write_parent(Fd, Result),
+        {ok, ResultPos} = write_parent(Fd, Result),
         {ResultPos, NewHeight+1, vtree:calc_nodes_mbr(Result)}
     end,
 
@@ -152,8 +151,8 @@ insert_outliers(Fd, TargetPos, TargetMbr, TargetHeight, Nodes) ->
         length(MbrAndPosList) + 1 =< ?MAX_FILLED ->
             % XXX vmx: is using type=inner always valid?
             NewRootNode = {MergedMbr, #node{type=inner}, [TargetPos|PosList]},
-            {ok, NewOmtPos, _} = couch_file:append_term(Fd, NewRootNode),
-            ok = couch_file:flush(Fd),
+            {ok, NewOmtPos} = couch_file:append_term(Fd, NewRootNode),
+            ok = couch_file:sync(Fd),
             {NewOmtPos, TargetHeight+1};
         % split the node and create new root node
         true ->
@@ -165,7 +164,7 @@ insert_outliers(Fd, TargetPos, TargetMbr, TargetHeight, Nodes) ->
                     [{TargetMbr, TargetPos}|MbrAndPosList]],
             NodeToSplit = {MergedMbr, #node{type=inner}, NewChildren},
             {_SplittedMbr, Node1, Node2} = vtree:split_node(NodeToSplit),
-            {ok, NewOmtPos, _} = write_parent(Fd, [Node1|[Node2]]),
+            {ok, NewOmtPos} = write_parent(Fd, [Node1|[Node2]]),
             {NewOmtPos, TargetHeight+2}
         end;
     % insert new tree into target tree
@@ -180,8 +179,8 @@ insert_outliers(Fd, TargetPos, TargetMbr, TargetHeight, Nodes) ->
         {OmtRootMbrs, OmtRootPosList} = lists:unzip(MbrAndPosList),
         OmtRootNode = {vtree:calc_mbr(OmtRootMbrs), #node{type=inner},
                 OmtRootPosList},
-        {ok, NewOmtPos, _} = couch_file:append_term(Fd, OmtRootNode),
-        ok = couch_file:flush(Fd),
+        {ok, NewOmtPos} = couch_file:append_term(Fd, OmtRootNode),
+        ok = couch_file:sync(Fd),
         {ok, _, SubPos, Inc} = insert_subtree(
                 Fd, NewOmtPos, [{TargetMbr, TargetPos}], abs(Diff)),
         {SubPos, OmtHeight+Inc}
@@ -263,14 +262,14 @@ omt_write_tree(Fd, [H|_T]=Leafs, _Depth, _Acc) when is_tuple(H) ->
         {Mbr, #node{type=leaf}, Leafs};
     false ->
         PosList = lists:map(fun(N) ->
-            {ok, Pos, _} = couch_file:append_term(Fd, N),
-            ok = couch_file:flush(Fd),
+            {ok, Pos} = couch_file:append_term(Fd, N),
+            ok = couch_file:sync(Fd),
             Pos
         end, Leafs),
         {Mbr, #node{type=inner}, PosList}
     end,
-    {ok, Pos, _} = couch_file:append_term(Fd, Node),
-    ok = couch_file:flush(Fd),
+    {ok, Pos} = couch_file:append_term(Fd, Node),
+    ok = couch_file:sync(Fd),
     {leaf_nodes, {Mbr, Pos}};
 omt_write_tree(Fd, [H|T], Depth, Acc) ->
     {_, Acc2} = case omt_write_tree(Fd, H, Depth+1, []) of
@@ -283,8 +282,8 @@ omt_write_tree(Fd, [H|T], Depth, Acc) ->
         {Mbrs, Children} = lists:unzip(lists:reverse(Level)),
         Mbr = vtree:calc_mbr(Mbrs),
         Meta = #node{type=inner},
-        {ok, Pos, _} = couch_file:append_term(Fd, {Mbr, Meta, Children}),
-        ok = couch_file:flush(Fd),
+        {ok, Pos} = couch_file:append_term(Fd, {Mbr, Meta, Children}),
+        ok = couch_file:sync(Fd),
         {ok, [{Mbr, Pos}|Acc]}
     end,
     {_, Acc3} = omt_write_tree(Fd, T, Depth, Acc2),
@@ -417,7 +416,7 @@ seedtree_write(Fd, Seedtree, InsertHeight) ->
         {RootNodes, 0};
     Outliers ->
         % insert outliers by creating a temporary root node...
-        {ok, TmpRootPos, _} = write_parent(Fd, RootNodes),
+        {ok, TmpRootPos} = write_parent(Fd, RootNodes),
         {TmpRootPos2, TmpHeight} = lists:foldl(fun(Outlier, {CurPos, _}) ->
             {Mbr, Meta, {DocId, {Geom, Value}}} = Outlier,
             {ok, _NewMbr, CurPos2, TreeHeight} = vtree:insert(
@@ -656,8 +655,8 @@ seedtree_write_insert(Fd, Orig, OmtTree, _OmtHeight) ->
             true -> #node{type=leaf};
             false -> #node{type=inner}
         end,
-        {ok, ParentPos, _} = couch_file:append_term(Fd, {ParentMbr, Meta, Pos}),
-        ok = couch_file:flush(Fd),
+        {ok, ParentPos} = couch_file:append_term(Fd, {ParentMbr, Meta, Pos}),
+        ok = couch_file:sync(Fd),
         {ParentMbr, ParentPos}
     end, NewNodes),
 
@@ -727,22 +726,21 @@ write_nodes(Fd, Nodes) ->
 write_nodes(_Fd, [], Acc) ->
     lists:reverse(Acc);
 write_nodes(Fd, [H|T], Acc) ->
-    {ok, Pos, _} = couch_file:append_term(Fd, H),
-    ok = couch_file:flush(Fd),
+    {ok, Pos} = couch_file:append_term(Fd, H),
+    ok = couch_file:sync(Fd),
     write_nodes(Fd, T, [Pos|Acc]).
 
 % @doc Write a list of of nodes to disk with corresponding parent node. Return
-%     the postion of the parent node in the file and the number of bytes
-%     written.
+%     the postion of the parent node in the file.
 -spec write_parent(Fd::file:io_device(), Nodes::[vtree_node()]) ->
-        {ok, integer(), integer()}.
+        {ok, integer()}.
 write_parent(Fd, Nodes) ->
     ParentMbr = vtree:calc_nodes_mbr(Nodes),
     ChildrenPos = write_nodes(Fd, Nodes),
-    {ok, ParentPos, Length} = couch_file:append_term(
+    {ok, ParentPos} = couch_file:append_term(
          Fd, {ParentMbr, #node{type=inner}, ChildrenPos}),
-    ok = couch_file:flush(Fd),
-    {ok, ParentPos, Length}.
+     ok = couch_file:sync(Fd),
+    {ok, ParentPos}.
 
 % XXX vmx: insert_subtree and potentially other functions should be moved
 %     from the vtree_bulk to the vtree module
@@ -756,8 +754,8 @@ insert_subtree(Fd, RootPos, Subtree, Level) ->
     case insert_subtree(Fd, RootPos, Subtree, Level, 0) of
     {splitted, NodeMbr, {_Node1Mbr, NodePos1}, {_Node2Mbr, NodePos2}, Inc} ->
         Parent = {NodeMbr, #node{type=inner}, [NodePos1, NodePos2]},
-        {ok, Pos, _} = couch_file:append_term(Fd, Parent),
-        ok = couch_file:flush(Fd),
+        {ok, Pos} = couch_file:append_term(Fd, Parent),
+        ok = couch_file:sync(Fd),
         {ok, NodeMbr, Pos, Inc+1};
     {ok, NewMbr, NewPos, Inc} ->
         {ok, NewMbr, NewPos, Inc}
@@ -779,8 +777,8 @@ insert_subtree(Fd, RootPos, Subtree, Level, Depth) when Depth==Level ->
     if
     length(ChildrenPos) =< ?MAX_FILLED ->
         NewNode = {MergedMbr, ParentMeta, ChildrenPos},
-        {ok, Pos, _} = couch_file:append_term(Fd, NewNode),
-        ok = couch_file:flush(Fd),
+        {ok, Pos} = couch_file:append_term(Fd, NewNode),
+        ok = couch_file:sync(Fd),
         {ok, MergedMbr, Pos, 0};
     true ->
         Children = load_nodes(Fd, ChildrenPos),
@@ -803,9 +801,9 @@ insert_subtree(Fd, RootPos, Subtree, Level, Depth) when Depth==Level ->
         Part2Pos = [Pos || {_Mbr, _Meta, Pos} <- Part2],
         Node1 =  {Mbr1, #node{type=inner}, Part1Pos},
         Node2 =  {Mbr2, #node{type=inner}, Part2Pos},
-        {ok, Pos1, _} = couch_file:append_term(Fd, Node1),
-        {ok, Pos2, _} = couch_file:append_term(Fd, Node2),
-        ok = couch_file:flush(Fd),
+        {ok, Pos1} = couch_file:append_term(Fd, Node1),
+        {ok, Pos2} = couch_file:append_term(Fd, Node2),
+        ok = couch_file:sync(Fd),
 
         {splitted, MergedMbr, {Mbr1, Pos1}, {Mbr2, Pos2}, 0}
     end;
@@ -824,8 +822,8 @@ insert_subtree(Fd, RootPos, Subtree, Level, Depth) ->
     {ok, NewMbr, NewPos, Inc} ->
         MergedMbr = vtree:merge_mbr(ParentMbr, NewMbr),
         NewNode = {MergedMbr, #node{type=inner}, [NewPos|LeastRestPos]},
-        {ok, Pos, _} = couch_file:append_term(Fd, NewNode),
-        ok = couch_file:flush(Fd),
+        {ok, Pos} = couch_file:append_term(Fd, NewNode),
+        ok = couch_file:sync(Fd),
         {ok, NewMbr, Pos, Inc};
     {splitted, ChildMbr, {Child1Mbr, ChildPos1}, {Child2Mbr, ChildPos2}, Inc} ->
         MergedMbr = vtree:merge_mbr(ParentMbr, ChildMbr),
@@ -836,8 +834,8 @@ insert_subtree(Fd, RootPos, Subtree, Level, Depth) ->
         length(LeastRestPos)+2 =< ?MAX_FILLED ->
             ChildrenPos = [ChildPos1, ChildPos2] ++ LeastRestPos,
             NewNode = {MergedMbr, #node{type=inner}, ChildrenPos},
-            {ok, Pos, _} = couch_file:append_term(Fd, NewNode),
-            ok = couch_file:flush(Fd),
+            {ok, Pos} = couch_file:append_term(Fd, NewNode),
+            ok = couch_file:sync(Fd),
             {ok, MergedMbr, Pos, Inc};
         % We need to split the inner node
         true ->
@@ -852,9 +850,9 @@ insert_subtree(Fd, RootPos, Subtree, Level, Depth) ->
             Children2 = [Child1, Child2] ++ Children,
             {SplittedMbr, {Node1Mbr, _, _}=Node1, {Node2Mbr, _, _}=Node2}
                     = vtree:split_node({MergedMbr, #node{type=inner}, Children2}),
-            {ok, Pos1, _} = couch_file:append_term(Fd, Node1),
-            {ok, Pos2, _} = couch_file:append_term(Fd, Node2),
-            ok = couch_file:flush(Fd),
+            {ok, Pos1} = couch_file:append_term(Fd, Node1),
+            {ok, Pos2} = couch_file:append_term(Fd, Node2),
+            ok = couch_file:sync(Fd),
             {splitted, SplittedMbr, {Node1Mbr, Pos1}, {Node2Mbr, Pos2}, Inc}
         end
     end.

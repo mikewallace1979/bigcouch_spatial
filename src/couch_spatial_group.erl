@@ -262,7 +262,7 @@ handle_info({'EXIT', FromPid, {new_group, #spatial_group{db=Db}=Group}},
             ref_counter=RefCounter,
             waiting_list=WaitList,
             waiting_commit=WaitingCommit}=State) when UpPid == FromPid ->
-    ok = couch_db:close(Db),
+    couch_db:close(Db),
     if not WaitingCommit ->
         erlang:send_after(1000, self(), delayed_commit);
     true -> ok

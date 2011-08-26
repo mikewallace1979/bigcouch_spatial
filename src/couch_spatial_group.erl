@@ -384,7 +384,7 @@ set_index_sig(#spatial_group{
     IndexInfo = [I#spatial{update_seq=0, purge_seq=0} || I <- Indexes],
     G#spatial_group{sig=couch_util:md5(term_to_binary(
         {IndexInfo, Language, DesignOptions, ?LATEST_SPATIAL_DISK_VERSION,
-        geocouch_duplicates:sort_lib(Lib)}))}.
+        couch_spatial_duplicates:sort_lib(Lib)}))}.
 
 
 prepare_group({RootDir, DbName, #spatial_group{sig=Sig}=Group}, ForceReset)->

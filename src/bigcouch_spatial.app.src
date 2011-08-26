@@ -1,7 +1,7 @@
 %% -*- mode:erlang;tab-width:4;erlang-indent-level:4;indent-tabs-mode:nil -*-
-{application, geocouch,
+{application, bigcouch_spatial,
  [
-  {description, "a spatial index for CouchDB"},
+  {description, "a spatial index for BigCouch"},
   {vsn, "0.1"}
 ]}.
 

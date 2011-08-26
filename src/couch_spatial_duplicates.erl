@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(geocouch_duplicates).
+-module(couch_spatial_duplicates).
 
 % This module contains functions that are needed by GeoCouch but that
 % are not exported by CouchDB. Here's the place to put the code from

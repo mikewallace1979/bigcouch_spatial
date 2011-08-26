@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(geocouch_chttpd).
+-module(bigcouch_spatial_chttpd).
 
 -export([handle_spatial_req/3, handle_spatial_list_req/3]).
 
@@ -38,7 +38,7 @@ handle_spatial_req(#httpd{method='GET',
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = start_json_response(Req, 200, [{"Etag",Etag}]),
         CB = fun spatial_callback/2,
-        geocouch:spatial(Db, DDoc, SpatialName, CB, {nil, Resp}, QueryArgs),
+        bigcouch_spatial:spatial(Db, DDoc, SpatialName, CB, {nil, Resp}, QueryArgs),
         chttpd:end_json_response(Resp)
     end);
 handle_spatial_req(Req, _Db, _DDoc) ->
@@ -66,7 +66,7 @@ handle_spatial_list(Req, ListName, SpatialName, Db, DDoc) ->
                 db = Db,
                 etag = Etag
             },
-            geocouch:spatial(Db, DDoc, SpatialName, CB, Acc0, QueryArgs)
+            bigcouch_spatial:spatial(Db, DDoc, SpatialName, CB, Acc0, QueryArgs)
         end)
     end).
 

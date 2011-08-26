@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(geocouch).
+-module(bigcouch_spatial).
 
 -export([spatial/3, spatial/4, spatial/6]).
 
@@ -37,7 +37,7 @@ spatial(DbName, DesignName, SpatialName, QueryArgs) ->
 -spec spatial(dbname(), #doc{}|binary(), iodata(), callback(), any(),
         #view_query_args{}) -> any().
 spatial(DbName, Design, SpatialName, Callback, Acc0, QueryArgs) ->
-    geocouch_fabric_spatial:go(dbname(DbName), Design, SpatialName, QueryArgs, 
+    bigcouch_spatial_fabric:go(dbname(DbName), Design, SpatialName, QueryArgs, 
         Callback, Acc0).
 
 

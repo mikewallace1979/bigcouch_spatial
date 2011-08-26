@@ -13,8 +13,6 @@
 -module(couch_spatial).
 -behaviour(gen_server).
 
--export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
-    terminate/2, code_change/3]).
 -export([fold/6]).
 % For List functions
 -export([get_spatial_index/4]).
@@ -24,6 +22,11 @@
 -export([get_group_info/2]).
 % For _spatial_cleanup
 -export([cleanup_index_files/1]).
+
+
+-export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
+    terminate/2, code_change/3]).
+
 
 
 -include_lib("couch/include/couch_db.hrl").
@@ -110,7 +113,7 @@ cleanup_index_files(Db) ->
     % It's ok to use a clone of couch_view:list_index_files, as
     % spatial indexes and view indexes are in the same
     % directory (view_index_dir setting)
-    FileList = geocouch_duplicates:list_index_files(Db),
+    FileList = couch_spatial_duplicates:list_index_files(Db),
 
     % regex that matches all ddocs
     RegExp = "("++ string:join(Sigs, "|") ++")",

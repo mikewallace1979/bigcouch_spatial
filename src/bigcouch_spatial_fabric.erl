@@ -11,7 +11,7 @@
 % the License.
 
 
--module(geocouch_fabric_spatial).
+-module(bigcouch_spatial_fabric).
 
 -include("couch_spatial.hrl").
 
@@ -208,7 +208,7 @@ transform_row(#spatial_row{bbox=Bbox, id=Id, geometry=Geom, value=Value,
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
-        Ref = rexi:cast(Node, {geocouch_fabric_rpc, EndPoint, [ShardName | ExtraArgs]}),
+        Ref = rexi:cast(Node, {bigcouch_spatial_rpc, EndPoint, [ShardName | ExtraArgs]}),
         Shard#shard{ref = Ref}
     end, Shards).
 

@@ -11,7 +11,7 @@
 % the License.
 
 
--module(geocouch_fabric_rpc).
+-module(bigcouch_spatial_rpc).
 
 -export([spatial/4]).
 

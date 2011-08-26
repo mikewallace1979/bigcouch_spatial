@@ -71,3 +71,22 @@
     start_response,
     send_row
 }).
+
+
+-record(spatial_collector, {
+    db_name=nil,
+    query_args,
+    callback,
+    counters,
+    buffer_size,
+    blocked = [],
+    total_rows = 0,
+    rows = [],
+    etag,
+    limit,
+    os_proc,
+    lang,
+    user_acc
+}).
+
+-record(spatial_row, {id, bbox, geometry, value, doc, worker}).

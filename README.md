@@ -73,7 +73,7 @@ the upper one. Such a bounding box has a seems invalid at first
 glance, but isn't. For example a bounding box like `110,-60,-30,15`
 would include Australia and South America, but not Africa.
 
-GeoCouch operates on a plane and doesn't perform spherical
+bigcouch_spatial operates on a plane and doesn't perform spherical
 calculations. Therefore the bounds of the plane needs to be set
 explicitly with the `plane_bounds` parameter. If bounding boxes are
 flipped, a search across those bounds will be performed
@@ -107,7 +107,7 @@ The bounding with the same numbers, but different order
 List function support
 ---------------------
 
-GeoCouch supports List functions just as CouchDB does for Views. This way
+bigcouch_spatial supports List functions just as CouchDB does for Views. This way
 you can output any arbitrary format, e.g. GeoRSS.
 
 As an example we output the points as WKT. Add a new Design Document
@@ -159,7 +159,7 @@ the query will return, not the geometry themselves.
 Compaction, cleanup and info
 ----------------------------
 
-The API of GeoCouch's spatial indexes is similar to the one for the
+The API of bigcouch_spatial's spatial indexes is similar to the one for the
 Views. Compaction of spatial indexes is per Design Document, thus:
 
     curl -X POST 'http://localhost:15984/places/_design/main/_spatial/_compact' -H 'Content-Type: application/json'

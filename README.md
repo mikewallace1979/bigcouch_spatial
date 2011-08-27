@@ -1,13 +1,22 @@
-Welcome to the world of GeoCouch
-================================
+bigcouch_spatial
+================
 
-GeoCouch is a spatial extension for Apache CouchDB.
+bigcouch_spatial is a spatial extension for bigcouch from Cloudant based
+on [geocouch](https://github.com/couchbase/geocouch).
 
-This version have been modified for [refuge project](http://refuge.io)
-needs.
 
-Using GeoCouch
---------------
+Requirements:
+-------------
+
+For now you can't add easily custom handlers to chttpd the HTTP layer of
+bigcouch so you need to use a patched version. You can either patch
+chttpd using the patch `0001-add-support-for-bigcouch_spatial.patch` in
+contrib and edit bigcouch/rebar.config to point to your own chttpd or
+just use upondata.
+
+
+Usage 
+-----
 
 Create a database:
 

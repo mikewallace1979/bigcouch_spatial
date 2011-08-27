@@ -15,7 +15,6 @@
 -export([handle_spatial_req/3, handle_spatial_list_req/3]).
 
 -include("couch_spatial.hrl").
--include_lib("chttpd/include/chttpd.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -import(chttpd,
@@ -23,6 +22,15 @@
     start_json_response/2, start_json_response/3, end_json_response/1,
     send_chunked_error/2]).
 
+
+-record(lacc, {
+    req,
+    resp = nil,
+    qserver,
+    lname,
+    db,
+    etag
+}).
 
 %% _spatial/_list handler (for compatibility with geocouch)
 handle_spatial_req(#httpd{method='GET', path_parts=[_, _,

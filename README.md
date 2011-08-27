@@ -123,7 +123,7 @@ Now you can request this List function as you would do for CouchDB,
 though with a different Design handler (`_spatial/_list` instead of
 `_list` ):
 
-    curl -X GET 'http://localhost:5984/places/_design/main/_spatial/_list/wkt/points?bbox=-180,-90,180,90'
+    curl -X GET 'http://localhost:5984/places/_design/main/_spatial_list/wkt/points?bbox=-180,-90,180,90'
 
 The result is:
 
@@ -132,15 +132,6 @@ The result is:
     POINT(17.15 -22.566667)
     POINT(135 -25)
     POINT(-52.95 -10.65)
-
-Using List functions from Design Documents other than the one containing the
-Spatial functions is supported as well. This time we add the Document
-ID in parenthesis:
-
-    curl -X PUT -d '{"lists": {"wkt": "function(head, req) {\n    var row;\n    while (row = getRow()) {\n        send(\"POINT(\" + row.value[1].join(\" \") + \") (\" + row.id + \")\\n\");\n    }\n};"}}' http://127.0.0.1:5984/places/_design/listfunonly
-
-    curl -X GET 'http://localhost:5984/places/_design/listfunonly/_spatial/_list/wkt/main/points?bbox=-180,-90,180,90'
-
 
 Other supported query arguments
 -------------------------------
@@ -154,13 +145,23 @@ as for the spatial List functions.
 `count` is a boolean. `count=true` will only return the number of geometries
 the query will return, not the geometry themselves.
 
-    curl -X GET 'http://localhost:5984/places/_design/main/_spatial/points?bbox=0,0,180,90'
+    curl -X GET 'http://localhost:5984/places/_design/main/_spatial/points?bbox=0,0,180,90?count=true'
 
     {"count":1}
 
 
+### include_docs ###
+`include_docs` is a boolean. `include_docs=true` means that just like in
+lists the doc will be added.
+
+### limit ###
+To limit the number of rows returned.
+
+
 Compaction, cleanup and info
 ----------------------------
+
+**NOT SUPPORTED in version 0.1**
 
 The API of bigcouch_spatial's spatial indexes is similar to the one for the
 Views. Compaction of spatial indexes is per Design Document, thus:

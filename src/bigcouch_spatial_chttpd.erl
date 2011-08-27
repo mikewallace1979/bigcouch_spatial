@@ -45,8 +45,11 @@ handle_spatial_req(#httpd{method='GET',
     Etag = couch_uuids:new(),
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = start_json_response(Req, 200, [{"Etag",Etag}]),
-        CB = fun spatial_callback/2,
-        bigcouch_spatial:spatial(Db, DDoc, SpatialName, CB, {nil, Resp}, QueryArgs),
+        {Acc0, CB} = case QueryArgs#spatial_query_args.count of
+            true -> {0, fun spatial_count_cb/2};
+            _ -> {nil, fun spatial_cb/2}
+        end,
+        bigcouch_spatial:spatial(Db, DDoc, SpatialName, CB, {Acc0, Resp}, QueryArgs),
         chttpd:end_json_response(Resp)
     end);
 handle_spatial_req(Req, _Db, _DDoc) ->
@@ -79,26 +82,35 @@ handle_spatial_list(Req, ListName, SpatialName, Db, DDoc) ->
     end).
 
 
+spatial_count_cb({row, _Row}, {Count, Resp}) ->
+    {ok, {Count + 1, Resp}};
+spatial_count_cb(complete, {Count, Resp}) ->
+    send_chunk(Resp, ?JSON_ENCODE({[{count, Count}]}));
+spatial_count_cb({error, Reason}, {_, Resp}) ->
+    {Code, ErrorStr, ReasonStr} = chttpd:error_info(Reason),
+    Json = {[{code,Code}, {error,ErrorStr}, {reason,ReasonStr}]},
+    send_chunk(Resp, [$\n, ?JSON_ENCODE(Json), $\n]).
 
-spatial_callback({total, Total}, {nil, Resp}) ->
+
+spatial_cb({total, Total}, {nil, Resp}) ->
     Chunk = "{\"total_rows\":~p,\"rows\":[\r\n",
     send_chunk(Resp, io_lib:format(Chunk, [Total])),
     {ok, {"", Resp}};
-spatial_callback({total, _}, Acc) ->
+spatial_cb({total, _}, Acc) ->
     % a sorted=false view where the message came in late.  Ignore.
     {ok, Acc};
-spatial_callback({row, Row}, {nil, Resp}) ->
+spatial_cb({row, Row}, {nil, Resp}) ->
     % first row 
     send_chunk(Resp, ["{\"rows\":[\r\n", ?JSON_ENCODE(Row)]),
     {ok, {",\r\n", Resp}};
-spatial_callback({row, Row}, {Prepend, Resp}) ->
+spatial_cb({row, Row}, {Prepend, Resp}) ->
     send_chunk(Resp, [Prepend, ?JSON_ENCODE(Row)]),
     {ok, {",\r\n", Resp}};
-spatial_callback(complete, {nil, Resp}) ->
+spatial_cb(complete, {nil, Resp}) ->
     send_chunk(Resp, "{\"rows\":[]}");
-spatial_callback(complete, {_, Resp}) ->
+spatial_cb(complete, {_, Resp}) ->
     send_chunk(Resp, "\r\n]}");
-spatial_callback({error, Reason}, {_, Resp}) ->
+spatial_cb({error, Reason}, {_, Resp}) ->
     {Code, ErrorStr, ReasonStr} = chttpd:error_info(Reason),
     Json = {[{code,Code}, {error,ErrorStr}, {reason,ReasonStr}]},
     send_chunk(Resp, [$\n, ?JSON_ENCODE(Json), $\n]).

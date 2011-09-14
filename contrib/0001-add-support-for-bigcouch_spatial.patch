@@ -1,0 +1,42 @@
+From 0c94d81405eefc90d430884137af8446664b1656 Mon Sep 17 00:00:00 2001
+From: benoitc <bchesneau@gmail.com>
+Date: Sat, 27 Aug 2011 11:56:28 +0200
+Subject: [PATCH] add support for bigcouch_spatial
+
+---
+ src/chttpd.erl      |    4 +++-
+ src/chttpd_show.erl |    3 ++-
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/chttpd.erl b/src/chttpd.erl
+index 1c93477..fc7881b 100644
+--- a/src/chttpd.erl
++++ b/src/chttpd.erl
+@@ -265,7 +265,9 @@ design_url_handlers() ->
+         {<<"_list">>,           fun chttpd_show:handle_view_list_req/3},
+         {<<"_update">>,         fun chttpd_show:handle_doc_update_req/3},
+         {<<"_info">>,           fun chttpd_db:handle_design_info_req/3},
+-        {<<"_rewrite">>,        fun chttpd_rewrite:handle_rewrite_req/3}
++        {<<"_rewrite">>,        fun chttpd_rewrite:handle_rewrite_req/3},
++        {<<"_spatial_list">>,   fun bigcouch_spatial_chttpd:handle_spatial_list_req/3},
++        {<<"_spatial">>,        fun bigcouch_spatial_chttpd:handle_spatial_req/3}
+     ].
+ 
+ % Utilities
+diff --git a/src/chttpd_show.erl b/src/chttpd_show.erl
+index eeb60ac..44300e4 100644
+--- a/src/chttpd_show.erl
++++ b/src/chttpd_show.erl
+@@ -12,7 +12,8 @@
+ 
+ -module(chttpd_show).
+ 
+--export([handle_doc_show_req/3, handle_doc_update_req/3, handle_view_list_req/3]).
++-export([handle_doc_show_req/3, handle_doc_update_req/3,
++        handle_view_list_req/3, list_callback/2]).
+ 
+ -include_lib("couch/include/couch_db.hrl").
+ 
+-- 
+1.7.4.4
+

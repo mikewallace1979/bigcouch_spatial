@@ -8,7 +8,7 @@
 -export([spatial_query/3, spatial_query/4, spatial_query/6]).
 -export([count/4, get_info/2, compact/2, cleanup/1]).
 
--include_lib("geocouch/include/geocouch.hrl").
+-include("geocouch.hrl").
 
 
 -record(gcacc, {

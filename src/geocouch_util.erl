@@ -7,7 +7,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("geocouch/include/geocouch.hrl").
+-include("geocouch.hrl").
 
 
 -export([get_indexer_pid/2, get_index/4]).

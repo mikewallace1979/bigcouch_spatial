@@ -8,7 +8,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("geocouch/include/geocouch.hrl").
+-include("geocouch.hrl").
 
 -export([
     handle_spatial_req/3,

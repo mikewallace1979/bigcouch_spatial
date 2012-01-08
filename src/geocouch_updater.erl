@@ -9,7 +9,7 @@
 -export([start_update/3, process_doc/3, finish_update/1, purge_index/4]).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("geocouch/include/geocouch.hrl").
+-include("geocouch.hrl").
 
 start_update(Partial, State, NumChanges) ->
     QueueOpts = [{max_size, 100000}, {max_items, 500}],

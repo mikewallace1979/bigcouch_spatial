@@ -8,7 +8,7 @@
 -export([run/1]).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("geocouch/include/geocouch.hrl").
+-include("geocouch.hrl").
 
 
 run(Db) ->

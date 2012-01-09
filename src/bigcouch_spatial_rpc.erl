@@ -29,7 +29,7 @@ spatial(DbName, DDoc, SpatialName, QueryArgs) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     #gcargs{
         bbox=Bbox,
-        stale=Stale,
+        stale=_Stale,
         bounds=Bounds,
         limit = Limit,
         include_docs = IncludeDocs,
@@ -37,17 +37,19 @@ spatial(DbName, DDoc, SpatialName, QueryArgs) ->
     } = QueryArgs,
     set_io_priority(DbName, Extra),
 
-    {ok, Index, Group} = couch_spatial:get_spatial_index(Db, 
-        DDoc#doc.id, SpatialName, Stale),
-
-    erlang:monitor(process, Group#spatial_group.fd),
+    {ok, Index, Sig, Args} = geocouch_util:get_index(Db, DDoc, SpatialName,
+            QueryArgs),
     Acc0 = #spatial_acc{
         db = Db,
         include_docs = IncludeDocs,
         limit = Limit
     },
-    {ok, {_, _Acc}} = couch_spatial:fold(Group, Index, fun
-            spatial_fold/2, {nil, Acc0}, Bbox, Bounds),
+    {ok, Acc1} = case Args#gcargs.preflight_fun of
+        PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc0);
+        _ -> {ok, Acc0}
+    end,
+    {ok, {_, _Acc}} = geocouch_util:fold(Index, fun
+            spatial_fold/2, {nil, Acc1}, Bbox, Bounds),
     rexi:reply(complete).
 
 

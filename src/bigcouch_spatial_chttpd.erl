@@ -14,7 +14,7 @@
 
 -export([handle_spatial_req/3, handle_spatial_list_req/3]).
 
--include("couch_spatial.hrl").
+-include("geocouch.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -import(chttpd,
@@ -45,7 +45,7 @@ handle_spatial_req(#httpd{method='GET',
     Etag = couch_uuids:new(),
     chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = start_json_response(Req, 200, [{"Etag",Etag}]),
-        {Acc0, CB} = case QueryArgs#spatial_query_args.count of
+        {Acc0, CB} = case QueryArgs#gcargs.count of
             true -> {0, fun spatial_count_cb/2};
             _ -> {nil, fun spatial_cb/2}
         end,
@@ -124,9 +124,9 @@ parse_spatial_params(Req) ->
     end, [], QueryList),
     QueryArgs = lists:foldl(fun({K, V}, Args2) ->
         validate_spatial_query(K, V, Args2)
-    end, #spatial_query_args{}, lists:reverse(QueryParams)),
+    end, #gcargs{}, lists:reverse(QueryParams)),
 
-    #spatial_query_args{
+    #gcargs{
         bbox = Bbox,
         bounds = Bounds
     } = QueryArgs,
@@ -165,21 +165,21 @@ parse_spatial_param(Key, Value) ->
     [{extra, {Key, Value}}].
 
 validate_spatial_query(bbox, Value, Args) ->
-    Args#spatial_query_args{bbox=Value};
+    Args#gcargs{bbox=Value};
 validate_spatial_query(stale, ok, Args) ->
-    Args#spatial_query_args{stale=ok};
+    Args#gcargs{stale=ok};
 validate_spatial_query(stale, update_after, Args) ->
-    Args#spatial_query_args{stale=update_after};
+    Args#gcargs{stale=update_after};
 validate_spatial_query(stale, _, Args) ->
     Args;
 validate_spatial_query(count, true, Args) ->
-    Args#spatial_query_args{count=true};
+    Args#gcargs{count=true};
 validate_spatial_query(bounds, Value, Args) ->
-    Args#spatial_query_args{bounds=Value};
+    Args#gcargs{bounds=Value};
 validate_spatial_query(limit, Value, Args) ->
-    Args#spatial_query_args{limit=Value};
+    Args#gcargs{limit=Value};
 validate_spatial_query(include_docs, true, Args) ->
-    Args#spatial_query_args{include_docs=true};
+    Args#gcargs{include_docs=true};
 validate_spatial_query(extra, _Value, Args) ->
     Args.
 

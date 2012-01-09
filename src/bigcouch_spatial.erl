@@ -14,7 +14,7 @@
 
 -export([spatial/3, spatial/4, spatial/6]).
 
--include("couch_spatial.hrl").
+-include("geocouch.hrl").
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -23,7 +23,7 @@
 
 %% @equiv spatial(DbName, DesignName, SpatialName, #spatial_query_args{})
 spatial(DbName, DesignName, SpatialName) ->
-    spatial(DbName, DesignName, SpatialName, #spatial_query_args{}).
+    spatial(DbName, DesignName, SpatialName, #gcargs{}).
 
 %% @equiv spatial(DbName, DesignName,
 %%                     SpatialName, fun default_callback/2, [], QueryArgs)

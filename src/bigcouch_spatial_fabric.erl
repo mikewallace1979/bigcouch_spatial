@@ -13,7 +13,7 @@
 
 -module(bigcouch_spatial_fabric).
 
--include("couch_spatial.hrl").
+-include("geocouch.hrl").
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -30,7 +30,7 @@ go(DbName, DDoc, Spatial, QueryArgs, Callback, Acc0) ->
     Shards = get_shards(DbName, QueryArgs),
     Workers = submit_jobs(Shards, spatial, [DDoc, Spatial, QueryArgs]),
     BufferSize = couch_config:get("fabric", "map_buffer_size", "2"),
-    #spatial_query_args{limit = Limit} = QueryArgs, 
+    #gcargs{limit = Limit} = QueryArgs, 
     State = #spatial_collector{
         db_name=DbName,
         query_args = QueryArgs,
@@ -148,7 +148,7 @@ possibly_embed_doc(_State, #spatial_row{value=undefined}=Row) ->
     Row;
 possibly_embed_doc(#spatial_collector{db_name=DbName, query_args=Args},
               #spatial_row{value=Value}=Row) ->
-    #spatial_query_args{include_docs=IncludeDocs} = Args,
+    #gcargs{include_docs=IncludeDocs} = Args,
     case IncludeDocs andalso is_tuple(Value) of
     true ->
         {Props} = Value,
@@ -169,7 +169,7 @@ possibly_embed_doc(#spatial_collector{db_name=DbName, query_args=Args},
     end.
 
 %% internal %%
-get_shards(DbName, #spatial_query_args{stale=ok}) ->
+get_shards(DbName, #gcargs{stale=ok}) ->
     mem3:ushards(DbName);
 get_shards(DbName, _) ->
     mem3:shards(DbName).

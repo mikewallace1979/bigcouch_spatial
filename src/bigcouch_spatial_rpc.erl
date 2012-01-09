@@ -15,7 +15,7 @@
 
 -export([spatial/4]).
 
--include("couch_spatial.hrl").
+-include("geocouch.hrl").
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -27,7 +27,7 @@
 
 spatial(DbName, DDoc, SpatialName, QueryArgs) ->
     {ok, Db} = couch_db:open_int(DbName, []),
-    #spatial_query_args{
+    #gcargs{
         bbox=Bbox,
         stale=Stale,
         bounds=Bounds,

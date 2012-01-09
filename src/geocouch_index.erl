@@ -73,9 +73,13 @@ open(Db, State) ->
             case (catch couch_file:read_header(Fd)) of
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
-                    {ok, geocouch_util:init_state(Db, Fd, State, Header)};
+                    NewSt = geocouch_util:init_state(Db, Fd, State, Header),
+                    erlang:monitor(process, Fd),
+                    {ok, NewSt};
                 _ ->
-                    {ok, geocouch_util:reset_index(Db, Fd, State)}
+                    NewSt = geocouch_util:reset_index(Db, Fd, State),
+                    erlang:monitor(process, Fd),
+                    {ok, NewSt}
             end;
         Error ->
             (catch geocouch_util:delete_index_file(RootDir, DbName, Sig)),

@@ -143,7 +143,9 @@ swap_compacted(OldState, NewState) ->
     ?LOG_INFO("Spatial index compaction complete for ~s ~s", [DbName, IdxName]),
 
     unlink(OldState#gcst.fd),
+    erlang:demonitor(process, OldState#gcst.fd),
     link(NewState#gcst.fd),
+    erlang:monitor(process, NewState#gcst.fd),
 
     IndexFName = geocouch_util:index_file(RootDir, DbName, Sig),
     CompactFName = geocouch_util:compaction_file(RootDir, DbName, Sig),

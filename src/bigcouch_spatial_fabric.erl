@@ -31,7 +31,7 @@ go(DbName, DDoc, Spatial, QueryArgs, Callback, Acc0) ->
     Workers = submit_jobs(Shards, spatial, [DDoc, Spatial, QueryArgs]),
     BufferSize = couch_config:get("fabric", "map_buffer_size", "2"),
     #gcargs{limit = Limit} = QueryArgs, 
-    State = #spatial_collector{
+    State = #gccollector{
         db_name=DbName,
         query_args = QueryArgs,
         callback = Callback,
@@ -43,9 +43,9 @@ go(DbName, DDoc, Spatial, QueryArgs, Callback, Acc0) ->
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
         State, infinity, 1000 * 60 * 60) of
     {ok, NewState} ->
-        {ok, NewState#spatial_collector.user_acc};
+        {ok, NewState#gccollector.user_acc};
     {timeout, NewState} ->
-        Callback({error, timeout}, NewState#spatial_collector.user_acc);
+        Callback({error, timeout}, NewState#gccollector.user_acc);
     {error, Resp} ->
         {ok, Resp}
     after
@@ -58,48 +58,48 @@ handle_message({rexi_DOWN, _, _, _}, nil, State) ->
     {ok, State};
 
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
-    #spatial_collector{callback=Callback, counters=Counters0, user_acc=Acc} = State,
+    #gccollector{callback=Callback, counters=Counters0, user_acc=Acc} = State,
     Counters = fabric_dict:erase(Worker, Counters0),
     case fabric_view:is_progress_possible(Counters) of
     true ->
-        {ok, State#spatial_collector{counters = Counters}};
+        {ok, State#gccollector{counters = Counters}};
     false ->
         {ok, Resp} = Callback({error, fabric_util:error_info(Reason)}, Acc),
         {error, Resp}
     end;
     
-handle_message(#spatial_row{} = Row, {Worker, From}, State) ->
-    #spatial_collector{counters = Counters0, rows = Rows0} = State,
+handle_message(#gcrow{} = Row, {Worker, From}, State) ->
+    #gccollector{counters = Counters0, rows = Rows0} = State,
     case fabric_dict:lookup_element(Worker, Counters0) of
     undefined ->
         gen_server:reply(From, stop),
         {ok, State};
     _ ->
-        Rows = merge_row(Row#spatial_row{worker=Worker}, Rows0),
+        Rows = merge_row(Row#gcrow{worker=Worker}, Rows0),
         Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
         Counters2 = fabric_view:remove_overlapping_shards(Worker, Counters1),
-        State1 = State#spatial_collector{rows=Rows, counters=Counters2},
+        State1 = State#gccollector{rows=Rows, counters=Counters2},
         State2 = maybe_pause_worker(Worker, From, State1),
         maybe_send_row(State2)
     end;
 
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, 
-        State#spatial_collector.counters),
-    maybe_send_row(State#spatial_collector{counters = Counters}).
+        State#gccollector.counters),
+    maybe_send_row(State#gccollector{counters = Counters}).
 
 maybe_pause_worker(Worker, From, State) ->
-    #spatial_collector{buffer_size = BufferSize, counters = Counters} = State,
+    #gccollector{buffer_size = BufferSize, counters = Counters} = State,
     case fabric_dict:lookup_element(Worker, Counters) of
     BufferSize ->
-        State#spatial_collector{blocked = [{Worker,From} | State#spatial_collector.blocked]};
+        State#gccollector{blocked = [{Worker,From} | State#gccollector.blocked]};
     _Count ->
         gen_server:reply(From, ok),
         State
     end.
 
 maybe_resume_worker(Worker, State) ->
-    #spatial_collector{buffer_size = Buffer, counters = C, blocked = B} = State,
+    #gccollector{buffer_size = Buffer, counters = C, blocked = B} = State,
     case fabric_dict:lookup_element(Worker, C) of
     Count when Count < Buffer/2 ->
         case couch_util:get_value(Worker, B) of
@@ -107,24 +107,24 @@ maybe_resume_worker(Worker, State) ->
             State;
         From ->
             gen_server:reply(From, ok),
-            State#spatial_collector{blocked = lists:keydelete(Worker, 1, B)}
+            State#gccollector{blocked = lists:keydelete(Worker, 1, B)}
         end;
     _Other ->
         State
     end.
 
-maybe_send_row(#spatial_collector{limit=0} = State) ->
-    #spatial_collector{counters=Counters, user_acc=AccIn, callback=Callback} = State,
+maybe_send_row(#gccollector{limit=0} = State) ->
+    #gccollector{counters=Counters, user_acc=AccIn, callback=Callback} = State,
     case fabric_dict:any(0, Counters) of
     true ->
         % we still need to send the total/offset header
         {ok, State};
     false ->
         {_, Acc} = Callback(complete, AccIn),
-        {stop, State#spatial_collector{user_acc=Acc}}
+        {stop, State#gccollector{user_acc=Acc}}
     end;
 maybe_send_row(State) ->
-    #spatial_collector{
+    #gccollector{
         callback = Callback,
         counters = Counters,
         limit = Limit,
@@ -138,23 +138,23 @@ maybe_send_row(State) ->
         {Row, NewState} ->
             case Callback(transform_row(possibly_embed_doc(NewState,Row)), AccIn) of
             {stop, Acc} ->
-                {stop, NewState#spatial_collector{user_acc=Acc}};
+                {stop, NewState#gccollector{user_acc=Acc}};
             {ok, Acc} -> 
-                maybe_send_row(NewState#spatial_collector{user_acc=Acc, limit=Limit-1})
+                maybe_send_row(NewState#gccollector{user_acc=Acc, limit=Limit-1})
             end
         catch complete ->
             {_, Acc} = Callback(complete, AccIn),
-            {stop, State#spatial_collector{user_acc=Acc}}
+            {stop, State#gccollector{user_acc=Acc}}
         end
     end.
 
 %% if include_docs=true is used when keys and
 %% the values contain "_id" then use the "_id"s
 %% to retrieve documents and embed in result
-possibly_embed_doc(_State, #spatial_row{value=undefined}=Row) ->
+possibly_embed_doc(_State, #gcrow{value=undefined}=Row) ->
     Row;
-possibly_embed_doc(#spatial_collector{db_name=DbName, query_args=Args},
-              #spatial_row{value=Value}=Row) ->
+possibly_embed_doc(#gccollector{db_name=DbName, query_args=Args},
+              #gcrow{value=Value}=Row) ->
     #gcargs{include_docs=IncludeDocs} = Args,
     case IncludeDocs andalso is_tuple(Value) of
     true ->
@@ -170,7 +170,7 @@ possibly_embed_doc(#spatial_collector{db_name=DbName, query_args=Args},
                 receive {'DOWN',Ref,process,Pid, Resp} ->
                         Resp
                 end,
-            Row#spatial_row{doc=couch_doc:to_json_obj(NewDoc,[])}
+            Row#gcrow{doc=couch_doc:to_json_obj(NewDoc,[])}
         end;
         _ -> Row
     end.
@@ -182,31 +182,31 @@ get_shards(DbName, _) ->
     mem3:shards(DbName).
 
 merge_row(Row, Rows) ->
-    lists:ukeysort(#spatial_row.id, [Row|Rows]).
+    lists:ukeysort(#gcrow.id, [Row|Rows]).
 
-get_next_row(#spatial_collector{rows = []}) ->
+get_next_row(#gccollector{rows = []}) ->
     throw(complete);
 get_next_row(State) ->
-    #spatial_collector{rows = [Row|Rest], counters = Counters0} = State,
-    Worker = Row#spatial_row.worker,
+    #gccollector{rows = [Row|Rest], counters = Counters0} = State,
+    Worker = Row#gcrow.worker,
     Counters1 = fabric_dict:update_counter(Worker, -1, Counters0),
     NewState = maybe_resume_worker(Worker, 
-        State#spatial_collector{counters=Counters1}),
-    {Row, NewState#spatial_collector{rows = Rest}}.
+        State#gccollector{counters=Counters1}),
+    {Row, NewState#gccollector{rows = Rest}}.
 
-transform_row(#spatial_row{bbox=Bbox, id=undefined}) ->
+transform_row(#gcrow{bbox=Bbox, id=undefined}) ->
     {row, {[{bbox, erlang:tuple_to_list(Bbox)}, {error,not_found}]}};
-transform_row(#spatial_row{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
+transform_row(#gcrow{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
         doc=undefined}) ->
     {row, {[{id,Id}, {bbox, erlang:tuple_to_list(Bbox)}, 
                 {geometry, couch_spatial_updater:geocouch_to_geojsongeom(Geom)}, 
                 {value,Value}]}};
-transform_row(#spatial_row{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
+transform_row(#gcrow{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
         doc={error,Reason}}) ->
     {row, {[{id,Id}, {bbox, erlang:tuple_to_list(Bbox)}, 
                 {geometry, couch_spatial_updater:geocouch_to_geojsongeom(Geom)}, 
                 {value,Value}, {error,Reason}]}};
-transform_row(#spatial_row{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
+transform_row(#gcrow{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
         doc=Doc}) ->
     {row, {[{id,Id}, {bbox,erlang:tuple_to_list(Bbox)}, 
                 {geometry, couch_spatial_updater:geocouch_to_geojsongeom(Geom)}, 

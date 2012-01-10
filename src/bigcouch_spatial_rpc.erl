@@ -87,7 +87,7 @@ spatial_fold({{Bbox, DocId}, {Geom, Value}}, {Resp, Acc}) ->
         Doc = undefined
     end,
     
-    case rexi:sync_reply(#spatial_row{bbox=Bbox, id=DocId, geometry=Geom, 
+    case rexi:sync_reply(#gcrow{bbox=Bbox, id=DocId, geometry=Geom, 
                 value=Value, doc=Doc}) of
         ok ->
             {ok, {Resp, Acc#spatial_acc{limit=Limit-1}}};

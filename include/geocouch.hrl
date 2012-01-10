@@ -68,7 +68,7 @@
     extra=[]
 }).
 
--record(spatial_collector, {
+-record(gccollector, {
     db_name=nil,
     query_args,
     callback,
@@ -84,4 +84,4 @@
     user_acc
 }).
 
--record(spatial_row, {id, bbox, geometry, value, doc, worker}).
+-record(gcrow, {id, bbox, geometry, value, doc, worker}).

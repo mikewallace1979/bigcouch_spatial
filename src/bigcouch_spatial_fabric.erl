@@ -70,11 +70,18 @@ handle_message({rexi_EXIT, Reason}, Worker, State) ->
     
 handle_message(#spatial_row{} = Row, {Worker, From}, State) ->
     #spatial_collector{counters = Counters0, rows = Rows0} = State,
-    Rows = merge_row(Row#spatial_row{worker=Worker}, Rows0),
-    Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
-    State1 = State#spatial_collector{rows=Rows, counters=Counters1},
-    State2 = maybe_pause_worker(Worker, From, State1),
-    maybe_send_row(State2);
+    case fabric_dict:lookup_element(Worker, Counters0) of
+    undefined ->
+        gen_server:reply(From, stop),
+        {ok, State};
+    _ ->
+        Rows = merge_row(Row#spatial_row{worker=Worker}, Rows0),
+        Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
+        Counters2 = fabric_view:remove_overlapping_shards(Worker, Counters1),
+        State1 = State#spatial_collector{rows=Rows, counters=Counters2},
+        State2 = maybe_pause_worker(Worker, From, State1),
+        maybe_send_row(State2)
+    end;
 
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, 

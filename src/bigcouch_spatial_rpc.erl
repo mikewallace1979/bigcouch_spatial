@@ -91,6 +91,8 @@ spatial_fold({{Bbox, DocId}, {Geom, Value}}, {Resp, Acc}) ->
                 value=Value, doc=Doc}) of
         ok ->
             {ok, {Resp, Acc#spatial_acc{limit=Limit-1}}};
+        stop ->
+            exit(normal);
         timeout ->
             exit(timeout)
     end.

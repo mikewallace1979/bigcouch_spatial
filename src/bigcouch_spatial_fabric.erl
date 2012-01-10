@@ -199,17 +199,17 @@ transform_row(#gcrow{bbox=Bbox, id=undefined}) ->
 transform_row(#gcrow{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
         doc=undefined}) ->
     {row, {[{id,Id}, {bbox, erlang:tuple_to_list(Bbox)}, 
-                {geometry, couch_spatial_updater:geocouch_to_geojsongeom(Geom)}, 
+                {geometry, geocouch_util:to_geojson(Geom)},
                 {value,Value}]}};
 transform_row(#gcrow{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
         doc={error,Reason}}) ->
     {row, {[{id,Id}, {bbox, erlang:tuple_to_list(Bbox)}, 
-                {geometry, couch_spatial_updater:geocouch_to_geojsongeom(Geom)}, 
+                {geometry, geocouch_util:to_geojson(Geom)},
                 {value,Value}, {error,Reason}]}};
 transform_row(#gcrow{bbox=Bbox, id=Id, geometry=Geom, value=Value, 
         doc=Doc}) ->
     {row, {[{id,Id}, {bbox,erlang:tuple_to_list(Bbox)}, 
-                {geometry, couch_spatial_updater:geocouch_to_geojsongeom(Geom)}, 
+                {geometry, geocouch_util:to_geojson(Geom)},
                 {value,Value}, {doc,Doc}]}}.
 
 
